@@ -14,11 +14,13 @@ _ERR_="1"
 AccessKeyId="testid"
 AccessKeySec="testsecret"
 DomainRecordId="00000"
+# DomainRR, use "@" to set top level domain
 DomainRR="www"
 DomainName="example.com"
 DomainType="A"
 # DNS Server for check current IP of the record
 # Perferred setting is your domain name service provider
+# Leave it blank if using the default DNS Server
 DNSServer="dns9.hichina.com"
 
 # The server address of ALi API
@@ -27,7 +29,6 @@ ALiServerAddr="alidns.aliyuncs.com"
 MyIPEchoUrl="http://members.3322.org/dyndns/getip"
 
 # the generatation a random number can be modified here
-rand_num=0
 #((rand_num=${RANDOM} * ${RANDOM} * ${RANDOM}))
 rand_num=$(openssl rand 16 -hex)
 
@@ -51,7 +52,7 @@ reset_func_ret()
 
 ## ----- params -----
 
-# This function will init all public params EXCLUDE "Signature" and "Value" 
+# This function will init all public params EXCLUDE "Signature"
 put_params_public()
 {
 	params["Format"]="JSON"
