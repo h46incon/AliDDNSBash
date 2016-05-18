@@ -1,4 +1,5 @@
 #!/bin/bash
+#By h46incon
 
 #Dependences: bind-dig, curl, openssl-util, sort(probably implemented by bash or other shell)
 
