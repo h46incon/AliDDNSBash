@@ -1,15 +1,7 @@
-#!/bin/bash
+#!/bin/sh
 #By h46incon
 
-#Dependences: bind-dig, curl, openssl-util, sort(probably implemented by bash or other shell)
-
-## ===== public =====
-
-## ----- Log level -----
-_DEBUG_="1"
-_LOG_="1"
-_ERR_="1"
-
+#Dependences: bind-dig, curl, openssl-util, tr, sort
 
 ## ----- Setting -----
 AccessKeyId="testid"
@@ -28,23 +20,31 @@ DNSServer="dns9.hichina.com"
 ALiServerAddr="alidns.aliyuncs.com"
 # A url provided by a third-party to echo the public IP of host
 MyIPEchoUrl="http://members.3322.org/dyndns/getip"
+# MyIPEchoUrl="http://icanhazip.com"
 
 # the generatation a random number can be modified here
 #((rand_num=${RANDOM} * ${RANDOM} * ${RANDOM}))
 rand_num=$(openssl rand 16 -hex)
 
+## ----- Log level -----
+_DEBUG_=true
+_LOG_=true
+_ERR_=true
+
 
 ## ===== private =====
 
 ## ----- global var -----
-declare -A params
+# g_pkey$i  # param keys
+# g_pval$i  # param values
+g_pn=0      # number of params
 _func_ret=""
 
 
 ## ----- Base Util -----
-_debug() { ((_DEBUG_)) && echo "> $*"; }
-_log() { ((_LOG_)) && echo "* $*"; }
-_err() { ((_ERR_)) && echo "! $*"; }
+_debug()	{ ${_DEBUG_} && echo "> $*"; }
+_log() 		{ ${_LOG_}   && echo "* $*"; }
+_err() 		{ ${_ERR_}   && echo "! $*"; }
 
 reset_func_ret()
 {
@@ -52,66 +52,68 @@ reset_func_ret()
 }
 
 ## ----- params -----
+# @Param1: Key
+# @Param2: Value
+put_param()
+{
+	eval g_pkey${g_pn}=$1
+	eval g_pval${g_pn}=$2
+	g_pn=$((g_pn + 1))
+}
 
 # This function will init all public params EXCLUDE "Signature"
 put_params_public()
 {
-	params["Format"]="JSON"
-	params["Version"]="2015-01-09"
-	params["AccessKeyId"]="${AccessKeyId}"
-	params["SignatureMethod"]="HMAC-SHA1"
+	put_param "Format" "JSON"
+	put_param "Version" "2015-01-09"
+	put_param "AccessKeyId" "${AccessKeyId}"
+	put_param "SignatureMethod" "HMAC-SHA1"
+	put_param "SignatureVersion" "1.0"
 
 	# time stamp
 	local time_utc=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-	params["Timestamp"]="${time_utc}"
-	_debug time_stamp: ${params[Timestamp]}
-
-	params["SignatureVersion"]="1.0"
+	_debug time_stamp: ${time_utc}
+	put_param "Timestamp" "${time_utc}"
 
 	# random number
 	_debug rand_num: ${rand_num}
-	params["SignatureNonce"]="${rand_num}"
+	put_param "SignatureNonce" "${rand_num}"
 }
-
 
 # @Param1: New IP address
 put_params_UpdateDomainRecord()
 {
-	params["Action"]="UpdateDomainRecord"
-	params["RR"]="${DomainRR}"
-	params["RecordId"]="${DomainRecordId}"
-	params["Type"]="${DomainType}"
-	params["Value"]="${1}"
+	put_param "Action" "UpdateDomainRecord"
+	put_param "RR" "${DomainRR}"
+	put_param "RecordId" "${DomainRecordId}"
+	put_param "Type" "${DomainType}"
+	put_param "Value" "${1}"
 }
 
 put_params_DescribeDomainRecords()
 {
-	params["Action"]="DescribeDomainRecords"
-	params["DomainName"]=${DomainName}
-}
-
-# @Param1: Signature
-put_params_Signature()
-{
-	params["Signature"]="${1}"
+	put_param "Action" "DescribeDomainRecords"
+	put_param "DomainName" ${DomainName}
 }
 
 pack_params()
 {
 	reset_func_ret
-
-	local key_enc=""
-	local val_enc=""
-
 	local ret=""
-	for key in "${!params[@]}"
+	local key key_enc val val_enc
+
+	local i=0
+	while [ $i -lt ${g_pn} ]
 	do
+		eval key="\$g_pkey${i}"
+		eval val="\$g_pval${i}"
 		rawurl_encode "${key}"
 		key_enc=${_func_ret}
-		rawurl_encode "${params[${key}]}"
+		rawurl_encode "${val}"
 		val_enc=${_func_ret}
-		
-		ret+="${key_enc}""=""${val_enc}""&"
+
+		ret="${ret}${key_enc}=${val_enc}&"
+		i=$((++i))
 	done
 
 	#delete last "&"
@@ -119,8 +121,7 @@ pack_params()
 }
 
 
-# ----- Other utils ----- 
-
+# ----- Other utils -----
 get_my_ip()
 {
 	reset_func_ret
@@ -134,17 +135,17 @@ get_domain_ip()
 {
 	reset_func_ret
 	local full_domain=""
-	if [ -z "${DomainRR}" ] || [ "${DomainRR}" == "@" ]; then 
+	if [ -z "${DomainRR}" ] || [ "${DomainRR}" == "@" ]; then
 		full_domain=${DomainName}
 	else
 		full_domain=${DomainRR}.${DomainName}
 	fi
 
 	local ns_param=""
-	if [ -z "${DNSServer}" ] ; then 
+	if [ -z "${DNSServer}" ] ; then
 		ns_param=""
 	else
-		ns_param="@""${DNSServer}"
+		ns_param="@${DNSServer}"
 	fi
 
 	_func_ret=$(dig "$ns_param" "${full_domain}" +short)
@@ -159,14 +160,17 @@ rawurl_encode()
 	local strlen=${#string}
 	local encoded=""
 	local pos c o
-	
-	for (( pos=0 ; pos<strlen ; pos++ )); do
+
+	pos=0
+	while [ ${pos} -lt ${strlen} ]
+	do
 		c=${string:$pos:1}
 		case "$c" in
 			[-_.~a-zA-Z0-9] ) o="${c}" ;;
-			* )               printf -v o '%%%02X' "'$c"
+			* )               o=$(printf "%%%02X" "'$c")
 		esac
-		encoded+="${o}"
+		encoded="${encoded}${o}"
+		pos=$(($pos + 1))
 	done
 	_func_ret="${encoded}" 
 }
@@ -175,38 +179,33 @@ calc_signature()
 {
 	reset_func_ret
 
-	# sort keys
-	local sorted_keys=( $(
-		for el in "${!params[@]}"
-		do 
-			echo "$el"
-		done | LC_COLLATE=C sort
-	) )
+	# sort key=val pairs
+	# key should not be rawurl-encoded because it need to sort
+	local sorted_token=$(
+		i=0
+		while [ $i -lt ${g_pn} ]
+		do
+			eval key="\$g_pkey$i"
 
-	# concat keys and values to get query string
-	local key_enc=""
-	local val_enc=""
+			eval val="\$g_pval$i"
+			rawurl_encode ${val}
+			val_enc=${_func_ret}
 
-	local query_str=""
-	for key in "${sorted_keys[@]}"
-	do
-		rawurl_encode "${key}"
-		key_enc=${_func_ret}
-		rawurl_encode "${params[${key}]}"
-		val_enc=${_func_ret}
+			i=$((++i))
 
-		query_str+="${key_enc}""=""${val_enc}""&"
-	done
-	# delete last "&"
-	query_str=${query_str%"&"}
-	
+			echo "${key}=${val_enc}"
+		done | LC_COLLATE=C sort | tr '\n' '&'
+	)
+
+	local query_str=${sorted_token%'&'}
+
 	_debug Query String: ${query_str}
 	# encode
 	rawurl_encode "${query_str}"
 	local encoded_str=${_func_ret}
 
 	local str_to_signed="GET&%2F&"${encoded_str}
-	local key_sign="${AccessKeySec}""&"
+	local key_sign="${AccessKeySec}&"
 
 	_func_ret=$(echo -n ${str_to_signed} | openssl dgst -binary -sha1 -hmac ${key_sign} | openssl enc -base64)
 }
@@ -216,13 +215,13 @@ send_request()
 	# put signature
 	calc_signature
 	local signature=${_func_ret}
-	put_params_Signature ${signature}
+	put_param "Signature" "${signature}"
 
 	# pack all params
 	pack_params
 	local packed_params=${_func_ret}
 
-	local req_url="${ALiServerAddr}""/?""${packed_params}"
+	local req_url="${ALiServerAddr}/?${packed_params}"
 	_debug Request addr: ${req_url}
 
 	local respond=$(curl -3 ${req_url} --silent --connect-timeout 10 -w "HttpCode:%{http_code}")
@@ -249,7 +248,8 @@ update_record()
 		_err Could not get my ip, exitting...
 		exit
 	fi
-	get_domain_ip;
+
+	get_domain_ip
 	local domain_ip=${_func_ret}
 	_debug Current Domain IP: ${domain_ip}
 
@@ -265,15 +265,10 @@ update_record()
 	send_request
 }
 
-
 main()
 {
 	#describe_record
 	update_record
 }
 
-
 main
-
-
-
