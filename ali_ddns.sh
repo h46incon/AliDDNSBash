@@ -35,9 +35,9 @@ _ERR_=true
 ## ===== private =====
 
 ## ----- global var -----
-# g_pkey$i  # param keys
-# g_pval$i  # param values
-g_pn=0      # number of params
+# g_pkey_$i    # param keys
+# g_pval_$key  # param values
+g_pn=0         # number of params
 _func_ret=""
 
 
@@ -56,8 +56,8 @@ reset_func_ret()
 # @Param2: Value
 put_param()
 {
-	eval g_pkey${g_pn}=$1
-	eval g_pval${g_pn}=$2
+	eval g_pkey_${g_pn}=$1
+	eval g_pval_$1=$2
 	g_pn=$((g_pn + 1))
 }
 
@@ -105,8 +105,8 @@ pack_params()
 	local i=0
 	while [ $i -lt ${g_pn} ]
 	do
-		eval key="\$g_pkey${i}"
-		eval val="\$g_pval${i}"
+		eval key="\$g_pkey_${i}"
+		eval val="\$g_pval_${key}"
 		rawurl_encode "${key}"
 		key_enc=${_func_ret}
 		rawurl_encode "${val}"
@@ -179,34 +179,40 @@ calc_signature()
 {
 	reset_func_ret
 
-	# sort key=val pairs
-	# key should not be rawurl-encoded because it need to sort
-	local sorted_token=$(
+	local sorted_key=$(
 		i=0
 		while [ $i -lt ${g_pn} ]
 		do
-			eval key="\$g_pkey$i"
-
-			eval val="\$g_pval$i"
-			rawurl_encode ${val}
-			val_enc=${_func_ret}
-
+			eval key="\$g_pkey_$i"
+			echo "${key}"
 			i=$((++i))
-
-			echo "${key}=${val_enc}"
-		done | LC_COLLATE=C sort | tr '\n' '&'
+		done | LC_COLLATE=C sort
 	)
 
-	local query_str=${sorted_token%'&'}
+	local query_str=""
+
+	for key in ${sorted_key}
+	do
+		eval val="\$g_pval_${key}"
+
+		rawurl_encode "${key}"
+		key_enc=${_func_ret}
+		rawurl_encode "${val}"
+		val_enc=${_func_ret}
+
+		query_str="${query_str}${key_enc}=${val_enc}&"
+	done
+
+	query_str=${query_str%'&'}
 
 	_debug Query String: ${query_str}
 	# encode
 	rawurl_encode "${query_str}"
 	local encoded_str=${_func_ret}
-
 	local str_to_signed="GET&%2F&"${encoded_str}
-	local key_sign="${AccessKeySec}&"
+	_debug String to Signed: ${str_to_signed}
 
+	local key_sign="${AccessKeySec}&"
 	_func_ret=$(echo -n ${str_to_signed} | openssl dgst -binary -sha1 -hmac ${key_sign} | openssl enc -base64)
 }
 
@@ -267,8 +273,8 @@ update_record()
 
 main()
 {
-	#describe_record
-	update_record
+	describe_record
+	#update_record
 }
 
 main
