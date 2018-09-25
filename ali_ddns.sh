@@ -24,7 +24,7 @@ MyIPEchoUrl="http://members.3322.org/dyndns/getip"
 
 # the generatation a random number can be modified here
 #((rand_num=${RANDOM} * ${RANDOM} * ${RANDOM}))
-rand_num=$(openssl rand 16 -hex)
+rand_num=$(openssl rand -hex 16)
 
 ## ----- Log level -----
 _DEBUG_=true
