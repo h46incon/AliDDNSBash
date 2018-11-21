@@ -213,7 +213,7 @@ calc_signature()
 	_debug String to Signed: ${str_to_signed}
 
 	local key_sign="${AccessKeySec}&"
-	_func_ret=$(echo -n ${str_to_signed} | openssl dgst -binary -sha1 -hmac ${key_sign} | openssl enc -base64)
+	_func_ret=$(/bin/echo -n ${str_to_signed} | openssl dgst -binary -sha1 -hmac ${key_sign} | openssl enc -base64)
 }
 
 send_request()
