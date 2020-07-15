@@ -186,7 +186,7 @@ calc_signature()
 			eval key="\$g_pkey_$i"
 			echo "${key}"
 			i=$((++i))
-		done | LC_COLLATE=C sort
+		done | LC_ALL=C sort
 	)
 
 	local query_str=""
