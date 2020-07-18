@@ -16,7 +16,7 @@
 ## 功能
 
 * 能在 OpenWRT 上原生的 ash 中执行。
-* 仅在当前IP地址和域名解析设置不同时，发起更新请求。（本机当前IP地址通过[3322.org提供的API](http://members.3322.org/dyndns/getip) 进行查询，域名的解析设置通过*dig*，向万网的DNS服务器直接进行查询。）
+* 仅在当前IP地址和域名解析设置不同时，发起更新请求。（本机当前IP地址通过[3322.org提供的API](http://members.3322.org/dyndns/getip) 进行查询，域名的解析设置通过API：*DescribeDomainRecordInfo* 查询。）
 * **还没**在脚本中分析API执行的结果，只是单纯打印出来。
 
 ## 使用方法
@@ -25,7 +25,7 @@
 
 首先需要一个*shell*（目标是支持所有符合 POSIX 标准的 shell，在 *ash* 和 *bash* 上测试通过）。
 
-然后安装 *bind-dig*，*curl*，*openssl-util*。这些软件包在OpenWRT下可直接使用 *opkg* 命令安装。
+然后安装*curl*，*openssl-util*。这些软件包在OpenWRT下可直接使用 *opkg* 命令安装。
 
 2. 修改脚本的`setting`代码段，其中`DomainRecordId`不清楚的话暂时不用修改，`DNSServer`修改为你在万网上使用的DNS服务器。如:
 ```sh

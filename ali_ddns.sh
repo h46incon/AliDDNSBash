@@ -11,10 +11,6 @@ DomainRecordId="00000"
 DomainRR="www"
 DomainName="example.com"
 DomainType="A"
-# DNS Server for check current IP of the record
-# Perferred setting is your domain name service provider
-# Leave it blank if using the default DNS Server
-DNSServer="dns9.hichina.com"
 
 # The server address of ALi API
 ALiServerAddr="alidns.aliyuncs.com"
@@ -61,6 +57,11 @@ put_param()
 	g_pn=$((g_pn + 1))
 }
 
+reset_param()
+{
+	g_pn=0
+}
+
 # This function will init all public params EXCLUDE "Signature"
 put_params_public()
 {
@@ -94,6 +95,12 @@ put_params_DescribeDomainRecords()
 {
 	put_param "Action" "DescribeDomainRecords"
 	put_param "DomainName" ${DomainName}
+}
+
+put_params_DescribeDomainRecordInfo()
+{
+	put_param "Action" "DescribeDomainRecordInfo"
+	put_param "RecordId" "${DomainRecordId}"
 }
 
 pack_params()
@@ -133,22 +140,14 @@ get_my_ip()
 
 get_domain_ip()
 {
+	put_params_public
+	put_params_DescribeDomainRecordInfo
+	send_request
+	local result=${_func_ret}
+	reset_param
 	reset_func_ret
-	local full_domain=""
-	if [ -z "${DomainRR}" ] || [ "${DomainRR}" == "@" ]; then
-		full_domain=${DomainName}
-	else
-		full_domain=${DomainRR}.${DomainName}
-	fi
 
-	local ns_param=""
-	if [ -z "${DNSServer}" ] ; then
-		ns_param=""
-	else
-		ns_param="@${DNSServer}"
-	fi
-
-	_func_ret=$(dig "$ns_param" "${full_domain}" +short)
+	_func_ret=$(echo ${result} |grep -Eo '"Value":"[0-9a-f:.]+"' |grep -Eo '[0-9a-f:.]{5,}')
 }
 
 # @Param1: Raw url to be encoded
@@ -186,7 +185,7 @@ calc_signature()
 			eval key="\$g_pkey_$i"
 			echo "${key}"
 			i=$((++i))
-		done | LC_COLLATE=C sort
+		done | LC_ALL=C sort
 	)
 
 	local query_str=""
@@ -218,6 +217,7 @@ calc_signature()
 
 send_request()
 {
+	reset_func_ret
 	# put signature
 	calc_signature
 	local signature=${_func_ret}
@@ -232,6 +232,7 @@ send_request()
 
 	local respond=$(curl -3 ${req_url} --silent --connect-timeout 10 -w "HttpCode:%{http_code}")
 	echo ${respond}
+	_func_ret=${respond}
 }
 
 describe_record()
