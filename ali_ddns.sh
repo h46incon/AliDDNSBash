@@ -1,7 +1,7 @@
 #!/bin/sh
 #By h46incon
 
-#Dependences: bind-dig, curl, openssl-util, tr, sort
+#Dependences: curl, openssl-util, tr, sort
 
 ## ----- Setting -----
 AccessKeyId="testid"
